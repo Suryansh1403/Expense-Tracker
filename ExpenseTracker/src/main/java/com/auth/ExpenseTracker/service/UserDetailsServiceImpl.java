@@ -1,6 +1,7 @@
 package com.auth.ExpenseTracker.service;
 
 import com.auth.ExpenseTracker.entities.UserInfo;
+import com.auth.ExpenseTracker.eventProducer.UserInfoEvent;
 import com.auth.ExpenseTracker.model.UserInfoDto;
 import com.auth.ExpenseTracker.repository.UserRepository;
 import org.slf4j.Logger;
@@ -11,7 +12,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
-
+import com.auth.ExpenseTracker.eventProducer.UserInfoProducer;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.UUID;
@@ -25,6 +26,10 @@ public class UserDetailsServiceImpl implements UserDetailsService
 
     @Autowired
     private  PasswordEncoder passwordEncoder;
+
+
+    @Autowired
+    private UserInfoProducer userInfoProducer;
 
     public UserDetailsServiceImpl(UserRepository userRepository, PasswordEncoder passwordEncoder){
         this.userRepository=userRepository;
@@ -62,7 +67,16 @@ public UserDetailsServiceImpl(){}
         UserInfo newUser = new UserInfo(userId,userInfoDto.getUsername(),userInfoDto.getPassword(),new HashSet<>());
 
         userRepository.save(newUser);
-        // pushEventToQueue
+        userInfoProducer.sendEventToKafka(userInfoEventToPublish(userInfoDto, userId));
         return true;
+    }
+    private UserInfoEvent userInfoEventToPublish(UserInfoDto userInfoDto, String userId){
+        return UserInfoEvent.builder()
+                .userId(userId)
+                .firstName(userInfoDto.getUsername())
+                .lastName(userInfoDto.getLastName())
+                .email(userInfoDto.getEmail())
+                .phoneNumber(userInfoDto.getPhoneNumber()).build();
+
     }
 }
